@@ -1,0 +1,26 @@
+p1: Random vs p2: Naive Monte Carlo
+
+After playing 50 games of 100 rounds, the results are: 
+ p1's final pot:  231800
+ p2's final pot:  768200
+ Congratulations! p2 has won.
+ Time taken to play: 263.1612 seconds
+
+
+
+p1: Fish vs p2: Naive Monte Carlo
+
+ After playing 50 games of 100 rounds, the results are: 
+ p1's final pot:  373620
+ p2's final pot:  626380
+ Congratulations! p2 has won.
+ Time taken to play: 263.1647 seconds
+
+
+p1: Raise vs p2: Naive Monte Carlo
+
+ After playing 50 games of 100 rounds, the results are: 
+ p1's final pot:  177000
+ p2's final pot:  822960
+ Congratulations! p2 has won.
+ Time taken to play: 381.8021 seconds
