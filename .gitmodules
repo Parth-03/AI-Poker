@@ -1,0 +1,3 @@
+[submodule "alpha-poker"]
+	path = alpha-poker
+	url = https://github.com/samonuall/alpha-zero-general.git
