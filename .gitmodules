@@ -1,0 +1,4 @@
+[submodule "alpha-poker"]
+	path = alpha-zero-general
+	url = https://github.com/samonuall/alpha-zero-general.git
+	branch = master
