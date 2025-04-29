@@ -30,12 +30,13 @@ class Emulator(object):
         self.blind_structure = blind_structure
 
     def register_player(self, uuid, player):
-        if not isinstance(player, BasePokerPlayer):
-            raise TypeError("player must inherit %s class." % BasePokerPlayer)
+        # Change this for training
+        # if not isinstance(player, BasePokerPlayer):
+        #     raise TypeError("player must inherit %s class." % BasePokerPlayer)
         
-        # Wrap the function with a timeout
-        default_action_info      = ("fold",0)  # Fold
-        player.declare_action = timeout2(0.5,default_action_info)(player.declare_action)
+        # # Wrap the function with a timeout
+        # default_action_info      = ("fold",0)  # Fold
+        # player.declare_action = timeout2(0.5,default_action_info)(player.declare_action)
         
         self.players_holder[uuid] = player
 
@@ -60,12 +61,12 @@ class Emulator(object):
         players = game_state["table"].seats.players
         player_pos = game_state["next_player"]
         sb_amount = game_state["small_blind_amount"]
-        return ActionChecker.legal_actions(players, player_pos, sb_amount)
+        return ActionChecker.legal_actions(players, player_pos, sb_amount, game_state["street"])
 
     def apply_action(self, game_state, action, bet_amount=0):
         if game_state["street"] == Const.Street.FINISHED:
             game_state, events = self._start_next_round(game_state)
-        updated_state, messages = RoundManager.apply_action(game_state, action, bet_amount)
+        updated_state, messages = RoundManager.apply_action(game_state, action)
         events = [self.create_event(message[1]["message"]) for message in messages]
         events = [e for e in events if e]
         if self._is_last_round(updated_state, self.game_rule):
@@ -86,9 +87,10 @@ class Emulator(object):
             next_player_uuid = game_state["table"].seats.players[next_player_pos].uuid
             next_player_algorithm = self.fetch_player(next_player_uuid)
             msg = MessageBuilder.build_ask_message(next_player_pos, game_state)["message"]
-            action, amount = next_player_algorithm.declare_action(\
+            # Seems like 683 maybe changed the code so bet amount is not possible?
+            action = next_player_algorithm.declare_action(\
                     msg["valid_actions"], msg["hole_card"], msg["round_state"])
-            game_state, messages = RoundManager.apply_action(game_state, action, amount)
+            game_state, messages = RoundManager.apply_action(game_state, action)
             mailbox += messages
         events = [self.create_event(message[1]["message"]) for message in mailbox]
         events = [e for e in events if e]

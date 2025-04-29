@@ -91,6 +91,7 @@ class ActionChecker:
     else:
       return max(raise_histories, key=lambda h: h["amount"])  # maxby
 
+# SaM: this is where the raise amount is calculated
   @classmethod
   def round_raise_amount(self, sb_amount,street):
     if street == 0 or street == 1:
