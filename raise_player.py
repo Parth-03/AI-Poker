@@ -5,6 +5,7 @@ import pprint
 class RaisedPlayer(BasePokerPlayer):
 
   def declare_action(self, valid_actions, hole_card, round_state):
+    print("valid_actions: ", valid_actions)
     for i in valid_actions:
         if i["action"] == "raise":
             action = i["action"]
