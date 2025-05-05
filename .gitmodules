@@ -2,3 +2,6 @@
 	path = alpha-zero-general
 	url = https://github.com/samonuall/alpha-zero-general.git
 	branch = master
+[submodule "CFR-Chance-Sampling"]
+	path = CFR-Chance-Sampling
+	url = https://github.com/d1lacy/CFR-Chance-Sampling.git
