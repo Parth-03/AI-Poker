@@ -1,5 +1,6 @@
 import os, sys
 sys.path.append(os.environ["BASE_DIR"] + "/alpha-zero-general")
+sys.path.append(os.getcwd())
 
 from pypokerengine.players import BasePokerPlayer
 from MCTS import MCTS
@@ -16,18 +17,64 @@ from pypokerengine.utils.card_utils import estimate_hole_card_win_rate, gen_card
 from poker.boardtexture import classify_board_texture, board_texture_to_onehot # Added import
 
 class AlphaPlayer(BasePokerPlayer):
-
-  def __init__(self, model=None, dim=None, **kwargs):
-    super().__init__(**kwargs)
+  
+  def __init__(self, model="alpha-zero-general/pretrained_data/naive_pretrained_model_100.pth.tar", dim=100, numSims=0):
+    super().__init__()
     self.hole_card = None
     self.opponent_hole_card = None
     self.num_raises_this_street = 0
-    self.dim = dim
-    self.model = model
+    self.dim = 100
+    self.numSims = numSims
+
+    self.currRound = 0
+    self.currStreet = None
+    
+    args = dotdict({
+        'lr': 0.0005,
+        'dropout': 0.3,
+        'epochs': 10,
+        'batch_size': 64,
+        'cuda': False,
+        "use_wandb": False, # Set to True to use wandb
+        "dim": self.dim
+        # 'run_name': 'poker_run_' + str(int(time.time())) # Remove run_name, wandb initialized externally
+    })
+    nnet = nn(PokerGame(), a=args)
+    stuff = model.split("/")
+    directory = "/".join(stuff[: -1])
+    file = stuff[-1]
+    nnet.load_checkpoint(directory, file)
+    self.nnet = nnet
   
   def declare_action(self, valid_actions, hole_card, round_state):
     hole_card = [str(card) for card in hole_card]
     self.hole_card = hole_card
+    
+    if self.currRound < round_state['round_count']:
+        deck = gen_deck(exclude_cards=hole_card)
+        deck.shuffle()
+        self.opponent_hole_card = deck.draw_cards(2)
+        self.opponent_hole_card = [str(card) for card in self.opponent_hole_card]
+
+        if round_state["seats"][1]["uuid"] == self.uuid:
+            self.currPlayer = 1
+        else:
+           self.currPlayer = -1
+        
+        self.currRound = round_state['round_count']
+        self.num_raises_this_street = 0
+
+    if self.currStreet != round_state['street']:
+       if self.opponent_hole_card[0] in round_state["community_card"] or self.opponent_hole_card[1] in round_state["community_card"]:
+            deck = gen_deck(exclude_cards= self.hole_card + round_state['community_card'])
+            deck.shuffle()
+            self.opponent_hole_cards = deck.draw_cards(2)
+            self.opponent_hole_card = [str(card) for card in self.opponent_hole_cards]
+       self.num_raises_this_street = 0
+    else:
+       if list(round_state["action_histories"].values())[-1][-1]["action"] == "RAISE":
+            self.num_raises_this_street += 1
+    
     
     for seat in round_state['seats']:
         if seat['uuid'] == self.uuid:
@@ -57,7 +104,6 @@ class AlphaPlayer(BasePokerPlayer):
     for player in board.player_states:
         # Set state for each
         cur_player = board.player_states[player]
-        # Set round count
         cur_player.set_round_count(round_state["round_count"])
         # Set pot
         cur_player.set_pot(round_state["pot"]["main"]["amount"])
@@ -90,10 +136,15 @@ class AlphaPlayer(BasePokerPlayer):
             texture_onehot = board_texture_to_onehot(texture_dict)
             cur_player.set_board_texture(texture_onehot)
 
-    board = self.game.getCanonicalForm(board, self.currPlayer)
-    action = np.argmax(self.mcts.getActionProb(board, temp=0))
-    # pi, v = self.nnet.predict(board)
-    # action = np.argmax(pi)
+    if self.numSims > 0:
+        game = PokerGame(max_round=round_state["round_count"])
+        board = game.getCanonicalForm(board, self.currPlayer)
+        args = dotdict({"numRandomSims": 5, "numMCTSSims": self.numSims, "cpuct": 1.0})
+        mcts = MCTS(game, self.nnet, args)
+        action = np.argmax(mcts.getActionProb(board, temp=0))
+    else:
+        pi, v = self.nnet.predict(board)
+        action = np.argmax(pi)
     # actions = ["raise", "call", "check", "fold"]
     if action == 0:
        return "raise"
@@ -104,49 +155,19 @@ class AlphaPlayer(BasePokerPlayer):
         
 
   def receive_game_start_message(self, game_info):
-    args = dotdict({
-        'lr': 0.0005,
-        'dropout': 0.3,
-        'epochs': 10,
-        'batch_size': 64,
-        'cuda': False,
-        "use_wandb": False, # Set to True to use wandb
-        "dim": self.dim
-        # 'run_name': 'poker_run_' + str(int(time.time())) # Remove run_name, wandb initialized externally
-    })
-    for player in game_info["seats"]:
-        if player['uuid'] != self.uuid:
-           other_uuid = player['uuid']
-    self.game = PokerGame(max_round=10, uuids=(self.uuid, other_uuid))
-    nnet = nn(self.game, a=args)
-    nnet.load_checkpoint("/Users/samonuallain/AI-Poker/alpha-zero-general/pretrained_data", self.model)
-    self.nnet = nnet
-    
-    args = dotdict({'numMCTSSims': 10, 'cpuct':1.0})
-    self.mcts = MCTS(self.game, nnet, args)
+    pass
 
   def receive_round_start_message(self, round_count, hole_card, seats):
-        deck = gen_deck(exclude_cards=hole_card)
-        deck.shuffle()
-        self.opponent_hole_card = deck.draw_cards(2)
-        self.opponent_hole_card = [str(card) for card in self.opponent_hole_card]
-
-        if seats[1]["uuid"] == self.uuid:
-            self.currPlayer = 1
-        else:
-           self.currPlayer = -1
+     pass
 
   def receive_street_start_message(self, street, round_state):
-    if self.opponent_hole_card[0] in round_state["community_card"] or self.opponent_hole_card[1] in round_state["community_card"]:
-        deck = gen_deck(exclude_cards= self.hole_card + round_state['community_card'])
-        deck.shuffle()
-        self.opponent_hole_cards = deck.draw_cards(2)
-        self.opponent_hole_card = [str(card) for card in self.opponent_hole_cards]
-    self.num_raises_this_street = 0
+    pass
 
   def receive_game_update_message(self, action, round_state):
-    if list(round_state["action_histories"].values())[-1][-1]["action"] == "RAISE":
-        self.num_raises_this_street += 1
+    pass
 
   def receive_round_result_message(self, winners, hand_info, round_state):
     pass
+
+def setup_ai():
+  return AlphaPlayer()
